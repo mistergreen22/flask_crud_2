@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData
+from marshmallow import Schema, fields, ValidationError, post_load
 
 engine = create_engine('sqlite:///:memory:', echo=True, connect_args={"check_same_thread": False})
 
@@ -11,6 +12,30 @@ user = Table('users', metadata,
              Column('age', Integer),
              Column('email', String(255)),
              )
+
+
+class UserSchema(Schema):
+    id = fields.Int()
+    first_name = fields.Str()
+    last_name = fields.Str()
+    age = fields.Int()
+    email = fields.Email()
+
+
+class UpdateSchema(Schema):
+    id = fields.Int(required=True)
+    first_name = fields.Str()
+    last_name = fields.Str()
+    age = fields.Int()
+    email = fields.Email()
+
+    @post_load
+    def check_existence(self, data, **kwargs):
+        s = user.select().where(user.columns.id == data['id'])
+        o = connection.execute(s).fetchone()
+        if o is None:
+            raise ValidationError(message="User doesn't exist")
+        return data
 
 
 def to_json(data):
