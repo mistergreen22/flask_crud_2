@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData
 from marshmallow import Schema, fields, ValidationError, post_load
 
+
 engine = create_engine('sqlite:///:memory:', echo=True, connect_args={"check_same_thread": False})
 
 metadata = MetaData()
@@ -22,7 +23,7 @@ class UserSchema(Schema):
     email = fields.Email()
 
 
-class UpdateSchema(Schema):
+class UserExistSchema(Schema):
     id = fields.Int(required=True)
     first_name = fields.Str()
     last_name = fields.Str()
@@ -31,13 +32,14 @@ class UpdateSchema(Schema):
 
     @post_load
     def check_existence(self, data, **kwargs):
-        s = user.select().where(user.columns.id == data['id'])
-        o = connection.execute(s).fetchone()
-        if o is None:
+        select_action = user.select().where(user.columns.id == data['id'])
+        selected_user = connection.execute(select_action).fetchone()
+        if selected_user is None:
             raise ValidationError(message="User doesn't exist")
         return data
 
 
+# deprecated
 def to_json(data):
     return {
         "id": data[0],
