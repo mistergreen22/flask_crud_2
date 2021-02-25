@@ -1,4 +1,5 @@
-from app.models import UserSchema, UserExistSchema
+from sqlalchemy import exc
+from app.schemas import UserSchema, UserExistSchema
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
 from http import HTTPStatus
@@ -7,7 +8,8 @@ from app.database_requests import (
     select_user,
     add_user,
     update_user,
-    delete_user
+    delete_user,
+    select_user_by_email
 )
 
 
@@ -22,8 +24,12 @@ def create_user():
         user_data = serialization_schema.load(request.json)
     except ValidationError as err:
         return err.messages, HTTPStatus.BAD_REQUEST
-    add_user(user_data)
-    return user_data, HTTPStatus.CREATED
+    try:
+        add_user(user_data)
+    except exc.IntegrityError:
+        return f'User with "{user_data["email"]}" email already exist, please chose another one.'
+    response = serialization_schema.dump(select_user_by_email(user_data['email']))
+    return jsonify(response), HTTPStatus.CREATED
 
 
 @users.route('/', methods=['GET'])
@@ -35,8 +41,8 @@ def read_all():
 
 @users.route('/<int:user_id>', methods=['GET'])
 def read_one(user_id):
+    data = dict(id=user_id)
     try:
-        data = dict(id=user_id)
         user_exist_schema.load(data)
     except ValidationError as err:
         return jsonify(message=err.messages), HTTPStatus.NOT_FOUND
@@ -46,15 +52,18 @@ def read_one(user_id):
 
 @users.route('/<int:user_id>', methods=['PUT', 'PATCH'])
 def update(user_id):
+    data = dict(id=user_id, **request.json)
     try:
-        data = dict(id=user_id, **request.json)
         user_data = user_exist_schema.load(data)
     except TypeError:
         return jsonify(message="You can't change id field"), HTTPStatus.BAD_REQUEST
     except ValidationError as err:
         return jsonify(message=err.messages), HTTPStatus.NOT_FOUND
 
-    update_user(user_id, user_data)
+    try:
+        update_user(user_id, user_data)
+    except exc.IntegrityError:
+        return f'User with "{data["email"]}" email already exist, please chose another one.'
     updated_user = select_user(user_id)
 
     return serialization_schema.dump(updated_user)
@@ -62,8 +71,8 @@ def update(user_id):
 
 @users.route('/<int:user_id>', methods=['DELETE'])
 def delete(user_id):
+    data = dict(id=user_id)
     try:
-        data = dict(id=user_id)
         user_exist_schema.load(data)
     except ValidationError as err:
         return jsonify(message=err.messages), HTTPStatus.NOT_FOUND

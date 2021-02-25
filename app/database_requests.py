@@ -7,6 +7,12 @@ def select_user(user_id):
     return selected_user
 
 
+def select_user_by_email(user_email):
+    select_user_action = user.select().where(user.columns.email == user_email)
+    selected_user = connection.execute(select_user_action).fetchone()
+    return selected_user
+
+
 def select_all():
     select_users = user.select()
     users = connection.execute(select_users).fetchall()
